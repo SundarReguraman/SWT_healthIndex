@@ -4,12 +4,12 @@ import { TankReading } from '../api/tankApi';
 function buildScript(reading: TankReading) {
   return [
     '> reading_sensors()',
-    `turbidity   = ${reading.turbidity.toFixed(1)}  NTU`,
+    `clarity     = ${(reading.clarity ?? 0).toFixed(1)}  pct`,
     `tds         = ${reading.tds.toFixed(0)}   ppm`,
     `temperature = ${reading.temperature.toFixed(1)}  degC`,
     `level       = ${reading.level.toFixed(0)}    pct`,
     '',
-    '> compute_health_index(turbidity, tds, temperature, level)',
+    '> compute_health_index(clarity, tds, temperature, level)',
     '  checking hard-flag thresholds...',
     '  normalizing inputs...',
     '  applying weights...',

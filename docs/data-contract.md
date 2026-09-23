@@ -5,7 +5,7 @@
 ```json
 {
   "deviceId": "tank-1",
-  "turbidity": 12.4,
+  "clarity": 92.0,
   "tds": 340,
   "temperature": 24.6,
   "level": 78
@@ -14,7 +14,7 @@
 
 ## Fields to confirm with the hardware team, per parameter
 
-For turbidity, TDS, temperature, and level:
+For clarity, TDS, temperature, and level:
 - Sensor model and raw output type (analog voltage / I2C / UART)
 - Calibration formula: raw ADC or pulse timing -> real-world unit
 - Valid operating range (sensor's min/max)
@@ -23,6 +23,6 @@ For turbidity, TDS, temperature, and level:
 ## System-level
 
 - Transport: HTTP POST (current), MQTT is a future option if push frequency increases
-- Push frequency: every 5s (adjust in tank_sensor.ino delay())
+- Push frequency: every 5s (adjust in SWT_healthIndex.ino delay())
 - Auth: none yet — add an API key header before deploying beyond a local demo
 - Multi-tank: deviceId field reserved for this; backend currently treats all readings as one tank

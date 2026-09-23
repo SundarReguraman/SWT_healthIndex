@@ -18,17 +18,19 @@ function scoreBand(value, idealMin, idealMax, failMin, failMax) {
 
 function checkHardFlags(reading) {
   const flags = [];
-  if (reading.turbidity >= CONFIG.turbidity.unsafeMax) flags.push('turbidity');
+  if (reading.clarity !== null && reading.clarity < CONFIG.clarity.unsafeMin) flags.push('clarity');
+  if (reading.clarity === null && reading.turbidity >= CONFIG.turbidity.unsafeMax) flags.push('turbidity');
   if (reading.tds >= CONFIG.tds.unsafeMax) flags.push('tds');
   return flags;
 }
 
+function scoreClarity(reading) {
+  if (reading.clarity !== null) return Math.max(0, Math.min(100, Math.round(reading.clarity)));
+  return scoreLowerIsBetter(reading.turbidity, CONFIG.turbidity.idealMax, CONFIG.turbidity.acceptableMax);
+}
+
 function computeScores(reading) {
-  const turbidityScore = scoreLowerIsBetter(
-    reading.turbidity,
-    CONFIG.turbidity.idealMax,
-    CONFIG.turbidity.acceptableMax
-  );
+  const clarityScore = scoreClarity(reading);
   const tdsScore = scoreBand(reading.tds, CONFIG.tds.idealMin, CONFIG.tds.idealMax, 0, CONFIG.tds.acceptableMax);
   const temperatureScore = scoreBand(
     reading.temperature,
@@ -41,7 +43,7 @@ function computeScores(reading) {
 
   const { weights } = CONFIG;
   const composite = Math.round(
-    turbidityScore * weights.turbidity +
+    clarityScore * weights.clarity +
       tdsScore * weights.tds +
       temperatureScore * weights.temperature +
       levelScore * weights.level
@@ -50,7 +52,7 @@ function computeScores(reading) {
   const flaggedParams = checkHardFlags(reading);
 
   return {
-    subScores: { turbidity: turbidityScore, tds: tdsScore, temperature: temperatureScore, level: levelScore },
+    subScores: { clarity: clarityScore, tds: tdsScore, temperature: temperatureScore, level: levelScore },
     composite,
     flagged: flaggedParams.length > 0,
     flaggedParams,
