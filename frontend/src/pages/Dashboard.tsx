@@ -16,11 +16,11 @@ export function Dashboard() {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <SensorCard
-          label="Turbidity"
-          value={reading.turbidity}
-          unit=" NTU"
-          subScore={reading.subScores.turbidity}
-          flagged={reading.flaggedParams.includes('turbidity')}
+          label="Clarity"
+          value={reading.clarity ?? 0}
+          unit="%"
+          subScore={reading.subScores.clarity}
+          flagged={reading.flaggedParams.includes('clarity')}
         />
         <SensorCard
           label="TDS"

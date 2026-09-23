@@ -4,6 +4,9 @@
 // Level is operational (tank capacity), not a water-quality parameter.
 
 module.exports = {
+  clarity: {
+    unsafeMin: 20,
+  },
   turbidity: {
     unit: 'NTU',
     idealMax: 1,
@@ -24,7 +27,7 @@ module.exports = {
     acceptableMax: 45,
   },
   weights: {
-    turbidity: 0.35,
+    clarity: 0.35,
     tds: 0.35,
     temperature: 0.15,
     level: 0.15,

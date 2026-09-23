@@ -6,7 +6,7 @@ React dashboard, producing a 0-100 health score and a Smart Health Index PDF rep
 ## Architecture
 
 ```
-[ Turbidity, TDS, Temperature, Level sensors ]
+[ Clarity, TDS, Temperature, Level sensors ]
                   |
             ESP32 (firmware/)
    - reads raw signals, averages/smooths
@@ -18,7 +18,7 @@ React dashboard, producing a 0-100 health score and a Smart Health Index PDF rep
    - validates payload
    - scores each parameter against
      WHO/EPA/BIS thresholds (docs/thresholds.md)
-   - hard-flags turbidity/TDS if unsafe
+  - hard-flags clarity/TDS if unsafe
    - computes weighted composite score
    - stores latest + history in memory
                   |
@@ -36,7 +36,7 @@ React dashboard, producing a 0-100 health score and a Smart Health Index PDF rep
 tank-health-index/
 ├── firmware/
 │   └── tank_sensor/
-│       └── tank_sensor.ino      # ESP32 sketch — fill in WiFi creds, pins, calibration
+│       └── SWT_healthIndex.ino  # ESP32 sketch — fill in WiFi creds, pins, calibration
 ├── backend/
 │   ├── package.json
 │   ├── .env.example
@@ -84,7 +84,7 @@ cp .env.example .env
 npm run dev           # -> http://localhost:5173
 ```
 
-Flash `firmware/tank_sensor/tank_sensor.ino` to the ESP32 after setting WiFi credentials,
+Flash `firmware/tank_sensor/SWT_healthIndex.ino` to the ESP32 after setting WiFi credentials,
 your backend machine's LAN IP, real sensor pins, and calibration formulas.
 
 ## Hardware team test procedure
@@ -98,7 +98,7 @@ record for wiring, calibration, communication, and end-to-end results.
 
 - Confirm the ESP32 supply voltage, sensor supply voltages, common ground, and logic-level
   compatibility before powering the setup.
-- Confirm the wiring matches the pins in `firmware/tank_sensor/tank_sensor.ino`.
+- Confirm the wiring matches the pins in `firmware/tank_sensor/SWT_healthIndex.ino`.
 - Test turbidity with clean and cloudy water.
 - Test TDS with low-mineral and mineralized water.
 - Compare temperature with a reference thermometer.
@@ -119,7 +119,7 @@ record for wiring, calibration, communication, and end-to-end results.
   `http://<backend-computer-LAN-IP>:3001/api/readings`.
 - Open the ESP32 serial monitor at `115200` baud.
 - Confirm it prints `WiFi connected`, then `POST response: 200` about every five seconds.
-- Confirm the JSON contains numeric `turbidity`, `tds`, `temperature`, and `level` fields and
+- Confirm the JSON contains numeric `clarity`, `tds`, `temperature`, and `level` fields and
   a `deviceId`, as specified in [`docs/data-contract.md`](docs/data-contract.md).
 
 ### 4. Run the end-to-end check
@@ -129,13 +129,13 @@ record for wiring, calibration, communication, and end-to-end results.
 - Confirm the backend receives the reading at `GET /api/score/latest` and stores it in
   `GET /api/readings/history`.
 - Confirm the dashboard displays the updated values and score.
-- Test unsafe turbidity and TDS conditions and confirm the dashboard/API reports the hard
+- Test unsafe clarity and TDS conditions and confirm the dashboard/API reports the hard
   flag.
 
 ### Firmware contribution and repository location
 
 The firmware source is locked into this repository at
-[`firmware/tank_sensor/tank_sensor.ino`](firmware/tank_sensor/tank_sensor.ino). Hardware
+[`firmware/tank_sensor/SWT_healthIndex.ino`](firmware/tank_sensor/SWT_healthIndex.ino). Hardware
 team members should make firmware and calibration changes there, commit them to a branch,
 and push that branch for review. Every firmware change should include an updated
 [`docs/hardware-test-form.md`](docs/hardware-test-form.md), serial-log or photo evidence

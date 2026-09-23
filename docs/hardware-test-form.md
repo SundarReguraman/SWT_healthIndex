@@ -20,7 +20,7 @@ Complete this form for each hardware revision or test run. Commit the completed 
 - ESP32 supply voltage:
 - Sensor supply voltages:
 - Common ground confirmed: [ ] Yes [ ] No
-- Pin assignments match `firmware/tank_sensor/tank_sensor.ino`: [ ] Yes [ ] No
+- Pin assignments match `firmware/tank_sensor/SWT_healthIndex.ino`: [ ] Yes [ ] No
 - Logic-level compatibility confirmed: [ ] Yes [ ] No
 - Wiring photo or link:
 - Notes:
@@ -73,7 +73,7 @@ Required JSON fields:
 ```json
 {
   "deviceId": "tank-1",
-  "turbidity": 12.4,
+  "clarity": 92.0,
   "tds": 340,
   "temperature": 24.6,
   "level": 78
@@ -86,7 +86,7 @@ Required JSON fields:
 - `GET /api/score/latest` returned the latest reading: [ ] Yes [ ] No
 - Dashboard displayed updated sensor values: [ ] Yes [ ] No
 - Dashboard score changed when a test input changed: [ ] Yes [ ] No
-- Unsafe turbidity/TDS test produced the expected flag: [ ] Yes [ ] No
+- Unsafe clarity/TDS test produced the expected flag: [ ] Yes [ ] No
 - Test log or screenshot link:
 
 ## Result and sign-off
