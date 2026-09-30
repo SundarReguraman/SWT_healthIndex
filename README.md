@@ -10,14 +10,47 @@ An intelligent, end-to-end drinking water storage tank monitoring and safety sys
 
 ---
 
-## 📺 Demonstration & Walkthrough Videos
+## 📺 Project Videos (MP4) & Walkthroughs
 
-### Live Telemetry Dashboard Preview
+Both videos are encoded in high-definition (1280x860, 30fps) **MP4 (H.264)** for universal playback across browsers, desktop media players (QuickTime, VLC), and mobile devices.
+
+---
+
+### 1. 🎥 Full System Walkthrough Video (`walkthrough_guide.mp4`)
+A comprehensive beginner-friendly walkthrough providing a structured visual guide to:
+- **System Architecture**: Flow of telemetry from ESP32 edge → Express scoring backend → React reactive dashboard.
+- **Hardware Pinouts & Wiring**: Step-by-step connection guide for TDS (GPIO 35), Turbidity (GPIO 34), DS18B20 (GPIO 4), and HC-SR04 (GPIO 5/18 with voltage divider).
+- **Zero-to-Hero Execution**: Installing dependencies, starting backend and frontend services, and running the simulator.
+- **Live UI Tour**: Interactive overview of sensor cards, animated computation terminal, radial gauge, and PDF audit generation.
+
+▶️ **Download / Watch Video**: [**`walkthrough_guide.mp4`**](walkthrough_guide.mp4)
+
+![Walkthrough Guide Preview](walkthrough_preview.gif)
+
+<video src="walkthrough_guide.mp4" controls="controls" width="100%">
+  <source src="walkthrough_guide.mp4" type="video/mp4">
+  Your browser does not support the video tag. <a href="walkthrough_guide.mp4">Click here to download walkthrough_guide.mp4</a>.
+</video>
+
+---
+
+### 2. 🚀 End-to-End Pipeline Demo Video (`demo_pipeline.mp4`)
+A live end-to-end recording demonstrating real-time sensor ingestion, dynamic score calculations, safety violations, and filtration recovery:
+1. **Baseline Safe State**: Pure municipal drinking water (TDS 185 ppm, Clarity 96%) → Health Index **97/100 (Bright Green Circle)**.
+2. **Normal Usage Drawdown**: Household water usage draining level to 68%.
+3. **Critical TDS Intrusion Alert**: Mineral surge spikes TDS to 1160 ppm (>1000 ppm threshold) → Immediately triggers **Hard Flag**, switches gauge to **Crimson Red**, and displays **Unsafe** badge.
+4. **Turbidity Silt Ingress**: Clarity drops to 13.5% (<20% threshold) → Enforces unsafe clarity flag.
+5. **Purification Recovery & Refill**: Filter flush restores clarity to 98% and TDS to 170 ppm → Health index restores to **99/100 (Safe, Green)**.
+6. **Audit Report Generation**: Interactive generation of the water quality audit report.
+
+▶️ **Download / Watch Video**: [**`demo_pipeline.mp4`**](demo_pipeline.mp4)
+
 ![Tank Health Index Live Dashboard Preview](demo_preview.gif)
 
-### Video Guides
-- 🎥 **[Watch Full System Walkthrough Video (`walkthrough_guide.mp4`)](walkthrough_guide.mp4)**: Complete step-by-step tour covering the project architecture, sensor wiring pinouts, environment setup, and dashboard interaction.
-- 🚀 **[Watch End-to-End Pipeline Demo Video (`demo_pipeline.mp4`)](demo_pipeline.mp4)**: High-resolution live capture demonstrating real-time sensor ingestion, water drawdown, critical TDS surge (**RED ALERT**), turbidity silt ingress, and filtration recovery.
+<video src="demo_pipeline.mp4" controls="controls" width="100%">
+  <source src="demo_pipeline.mp4" type="video/mp4">
+  Your browser does not support the video tag. <a href="demo_pipeline.mp4">Click here to download demo_pipeline.mp4</a>.
+</video>
 
 ---
 
@@ -103,9 +136,10 @@ SWT_healthIndex/
 ├── simulate_esp32.js                # Built-in ESP32 hardware simulator
 ├── record_pipeline_demo.js          # Playwright pipeline tester & demo recorder
 ├── record_walkthrough.js            # Walkthrough recorder
-├── demo_pipeline.mp4                # Captured demo video (MP4)
-├── walkthrough_guide.mp4            # Captured walkthrough video (MP4)
-└── demo_preview.gif                 # Animated dashboard preview GIF
+├── demo_pipeline.mp4                # Captured live telemetry pipeline demo video (MP4)
+├── walkthrough_guide.mp4            # Captured beginner walkthrough video (MP4)
+├── demo_preview.gif                 # Animated pipeline preview GIF
+└── walkthrough_preview.gif          # Animated walkthrough preview GIF
 ```
 
 ---
