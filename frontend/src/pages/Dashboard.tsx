@@ -25,7 +25,6 @@ export function Dashboard() {
     SCHEDULE_MAINTENANCE: 'border-amber-500/30 bg-amber-950/20 text-amber-400',
     IMMEDIATE_CLEANING: 'border-red-500/30 bg-red-950/20 text-red-400',
   }[reading.zone || 'GOOD'];
-
   return (
     <div className="max-w-3xl mx-auto p-8 space-y-8">
       <div className="flex flex-col items-center gap-2">
