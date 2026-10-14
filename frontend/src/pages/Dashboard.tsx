@@ -5,7 +5,7 @@ import { TankLevel } from '../components/TankLevel';
 import { MetricTile } from '../components/MetricTile';
 import { ScoreDetails } from '../components/ScoreDetails';
 
-// A reading older than this means the sensor has stopped posting (demo data arrives once a minute).
+// A reading older than this means the sensor has stopped posting (readings can arrive as slowly as once a minute).
 const STALE_MS = 3 * 60_000;
 
 function timeAgo(ms: number) {
@@ -31,7 +31,6 @@ export function Dashboard() {
   const now = useNow();
 
   const live = reachable && reading !== null && now - reading.timestamp < STALE_MS;
-  const demo = reading?.source === 'demo';
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
@@ -42,13 +41,13 @@ export function Dashboard() {
         </div>
         <div className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs text-zinc-600">
           <span className="relative flex h-2 w-2">
-            {live && !demo && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />}
-            <span className={`relative inline-flex h-2 w-2 rounded-full ${!live ? 'bg-zinc-400' : demo ? 'bg-sky-500' : 'bg-emerald-500'}`} />
+            {live && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />}
+            <span className={`relative inline-flex h-2 w-2 rounded-full ${live ? 'bg-emerald-500' : 'bg-zinc-400'}`} />
           </span>
           {!reachable
             ? 'Server unreachable'
             : reading
-              ? `${!live ? 'Sensor offline' : demo ? 'Demo data' : 'Live'} · updated ${timeAgo(now - reading.timestamp)}`
+              ? `${live ? 'Updated' : 'Sensor offline · updated'} ${timeAgo(now - reading.timestamp)}`
               : 'Waiting for sensor'}
         </div>
       </header>
