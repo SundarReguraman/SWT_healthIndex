@@ -110,31 +110,34 @@ function checkHardFlags(reading) {
 }
 
 function buildDiagnostics(reading, subScores, flaggedParams, zone) {
-  const causes = [];
+  // Hard-flag causes are listed before soft ones so the headline message names the flag that set the zone.
+  const flagCauses = [];
+  const softCauses = [];
   const c = Number(reading.clarity ?? 100);
   const d = Number(reading.tds ?? 0);
   const t = Number(reading.temperature ?? 25);
 
   if (flaggedParams.includes('clarity') || flaggedParams.includes('turbidity')) {
-    causes.push(`Water is visibly cloudy (${c.toFixed(0)}%) — drain and scrub the tank to remove settled bottom sludge.`);
+    flagCauses.push(`Water is visibly cloudy (${c.toFixed(0)}%) — drain and scrub the tank to remove settled bottom sludge.`);
   } else if (subScores.clarity < 50) {
-    causes.push(`Slight cloudiness detected (${c.toFixed(0)}%) — fine silt or sediment is building up at the tank bottom.`);
+    softCauses.push(`Slight cloudiness detected (${c.toFixed(0)}%) — fine silt or sediment is building up at the tank bottom.`);
   }
 
   if (flaggedParams.includes('tds')) {
-    causes.push(`Very high dissolved solids (${d.toFixed(0)} ppm) — exceeds safe drinking limit (1000 ppm); check supply or RO membrane.`);
+    flagCauses.push(`Very high dissolved solids (${d.toFixed(0)} ppm) — exceeds safe drinking limit (1000 ppm); check supply or RO membrane.`);
   } else if (subScores.tds < 50) {
-    causes.push(`Dissolved mineral levels (${d.toFixed(0)} ppm) exceed the 500 ppm BIS ideal drinking limit.`);
+    softCauses.push(`Dissolved mineral levels (${d.toFixed(0)} ppm) exceed the 500 ppm BIS ideal drinking limit.`);
   }
 
   if (flaggedParams.includes('temperature')) {
-    causes.push(`Water is dangerously warm (${t.toFixed(1)}°C) — high risk of bacterial growth; flush tank and shade roof cover.`);
+    flagCauses.push(`Water is dangerously warm (${t.toFixed(1)}°C) — high risk of bacterial growth; flush tank and shade roof cover.`);
   } else if (flaggedParams.includes('compound_warm_cloudy')) {
-    causes.push(`Warm (${t.toFixed(1)}°C) and cloudy (${c.toFixed(0)}%) water accelerates bacterial and biofilm growth — clean tank immediately.`);
+    flagCauses.push(`Warm (${t.toFixed(1)}°C) and cloudy (${c.toFixed(0)}%) water accelerates bacterial and biofilm growth — clean tank immediately.`);
   } else if (subScores.temperature < 50) {
-    causes.push(`Tank water is warm (${t.toFixed(1)}°C) — shade or insulate the tank lid to slow chlorine decay and microbial growth.`);
+    softCauses.push(`Tank water is warm (${t.toFixed(1)}°C) — shade or insulate the tank lid to slow chlorine decay and microbial growth.`);
   }
 
+  const causes = [...flagCauses, ...softCauses];
   if (causes.length === 0) {
     causes.push('All water quality parameters are within safe WHO and BIS drinking limits.');
   }
