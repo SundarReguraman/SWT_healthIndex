@@ -162,12 +162,19 @@ cp .env.example .env
 npm run dev          # Runs on http://localhost:5173
 ```
 
-### 3. Test Immediately (Without Physical Hardware)
-If you do not have physical sensors or an ESP32 connected yet, run the built-in simulator from the root directory:
+### 3. Demo Mode (Without Physical Hardware)
+For a steady, presentation-ready feed, start the backend in demo mode instead of `npm run start`:
 ```bash
-node simulate_esp32.js
+cd backend
+npm run demo                              # healthy tank (default)
+node src/server.js --demo=attention       # "Needs attention" state
+node src/server.js --demo=critical        # "Clean now" state
 ```
-Open **[http://localhost:5173](http://localhost:5173)** in your browser to see the live dashboard updating in real time!
+Demo mode posts one reading per minute that follows a realistic daily pattern (afternoon warm-up, pump refills at 06:00 and 18:00, slow clarity decline between weekly cleanings). Values are computed from the clock, so restarting resumes the same series, and the last hour is backfilled so trend lines are filled immediately. The dashboard labels these readings **Demo data**. If a real ESP32 posts, the demo pauses automatically for 2 minutes after its last reading.
+
+To stress-test all zones quickly instead, run the rapid simulator from the root directory: `node simulate_esp32.js`.
+
+Open **[http://localhost:5173](http://localhost:5173)** in your browser to see the dashboard.
 
 ---
 

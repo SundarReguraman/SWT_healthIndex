@@ -9,9 +9,10 @@ interface MetricTileProps {
   subScore: number;
   flagged: boolean;
   trend: number[];
+  trendSpan: number;
 }
 
-export function MetricTile({ label, hint, value, unit, subScore, flagged, trend }: MetricTileProps) {
+export function MetricTile({ label, hint, value, unit, subScore, flagged, trend, trendSpan }: MetricTileProps) {
   const status = paramStatus(subScore, flagged);
   const tone = TONE[status.tone];
 
@@ -33,7 +34,7 @@ export function MetricTile({ label, hint, value, unit, subScore, flagged, trend 
       </p>
 
       <div className="mt-3">
-        <Sparkline values={trend} color={tone.stroke} />
+        <Sparkline values={trend} color={tone.stroke} minSpan={trendSpan} />
       </div>
     </section>
   );

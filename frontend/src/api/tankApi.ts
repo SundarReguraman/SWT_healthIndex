@@ -5,6 +5,7 @@ export type LevelStatus = 'NORMAL' | 'REFILL_SOON' | 'LOW' | 'CRITICAL_LOW';
 
 export interface TankReading {
   deviceId: string;
+  source?: 'live' | 'demo';
   clarity: number | null;
   turbidity: number | null;
   tds: number;

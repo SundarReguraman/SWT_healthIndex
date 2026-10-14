@@ -5,8 +5,8 @@ import { TankLevel } from '../components/TankLevel';
 import { MetricTile } from '../components/MetricTile';
 import { ScoreDetails } from '../components/ScoreDetails';
 
-// A reading older than this means the sensor has stopped posting.
-const STALE_MS = 30_000;
+// A reading older than this means the sensor has stopped posting (demo data arrives once a minute).
+const STALE_MS = 3 * 60_000;
 
 function timeAgo(ms: number) {
   const s = Math.max(0, Math.round(ms / 1000));
@@ -31,6 +31,7 @@ export function Dashboard() {
   const now = useNow();
 
   const live = reachable && reading !== null && now - reading.timestamp < STALE_MS;
+  const demo = reading?.source === 'demo';
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
@@ -41,13 +42,13 @@ export function Dashboard() {
         </div>
         <div className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs text-zinc-600">
           <span className="relative flex h-2 w-2">
-            {live && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />}
-            <span className={`relative inline-flex h-2 w-2 rounded-full ${live ? 'bg-emerald-500' : 'bg-zinc-400'}`} />
+            {live && !demo && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />}
+            <span className={`relative inline-flex h-2 w-2 rounded-full ${!live ? 'bg-zinc-400' : demo ? 'bg-sky-500' : 'bg-emerald-500'}`} />
           </span>
           {!reachable
             ? 'Server unreachable'
             : reading
-              ? `${live ? 'Live' : 'Sensor offline'} · updated ${timeAgo(now - reading.timestamp)}`
+              ? `${!live ? 'Sensor offline' : demo ? 'Demo data' : 'Live'} · updated ${timeAgo(now - reading.timestamp)}`
               : 'Waiting for sensor'}
         </div>
       </header>
@@ -75,6 +76,7 @@ export function Dashboard() {
               subScore={reading.subScores.clarity}
               flagged={reading.flaggedParams.includes('clarity') || reading.flaggedParams.includes('turbidity')}
               trend={history.map((h) => h.clarity ?? 0)}
+              trendSpan={10}
             />
             <MetricTile
               label="Dissolved salts"
@@ -84,6 +86,7 @@ export function Dashboard() {
               subScore={reading.subScores.tds}
               flagged={reading.flaggedParams.includes('tds')}
               trend={history.map((h) => h.tds)}
+              trendSpan={60}
             />
             <MetricTile
               label="Temperature"
@@ -93,6 +96,7 @@ export function Dashboard() {
               subScore={reading.subScores.temperature}
               flagged={reading.flaggedParams.includes('temperature')}
               trend={history.map((h) => h.temperature)}
+              trendSpan={4}
             />
           </div>
 

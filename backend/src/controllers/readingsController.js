@@ -17,6 +17,7 @@ function postReading(req, res) {
   const { clarity, turbidity, tds, temperature, level, deviceId } = req.body;
   const reading = {
     deviceId: deviceId || 'tank-1',
+    source: 'live',
     clarity: clarity ?? null,
     turbidity: turbidity ?? null,
     tds,
