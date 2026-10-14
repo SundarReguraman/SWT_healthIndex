@@ -15,28 +15,64 @@ const char* deviceId = "tank-1";
 #define TRIG_PIN 5
 #define ECHO_PIN 18
 
-// ----- Tank dimensions - adjust to your tank -----
+// ----- Tank dimensions & JSN-SR04T ultrasonic dead-zone offset -----
 const float TANK_HEIGHT_CM = 100.0;
-const float SENSOR_OFFSET_CM = 2.0;
+// JSN-SR04T waterproof transducer has a ~20-25 cm minimum blind zone.
+// Mount sensor >= 22 cm above full waterline so 100% full = 22 cm distance.
+const float SENSOR_OFFSET_CM = 22.0;
+
+// ----- 3.3V Hardware Calibration Constants (12-bit ADC: 0-4095) -----
+// Turbidity (GPIO 34 @ 3.3V): ~800+ raw counts in clear water, ~95 in cloudy water
+const int TURB_RAW_CLEAR = 800;
+const int TURB_RAW_CLOUDY = 95;
+
+// TDS (GPIO 35 @ 3.3V): probe cell constant K-factor & air deadband
+const float TDS_K_FACTOR = 1.00;
+const int TDS_AIR_DEADBAND_RAW = 15;
+
+// Cached fallback state so a single missed echo never blocks water-quality POSTs
+float lastValidLevelPercent = 75.0;
+float lastValidTempC = 32.5;
 
 // ----- Temperature sensor setup -----
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature tempSensor(&oneWire);
 
-float getTDSppm(float voltage, float temperatureC) {
+// Median filter over N samples to reject ESP32 Wi-Fi ADC spikes
+int readMedianADC(int pin, int samples = 15) {
+  int buf[15];
+  int count = constrain(samples, 3, 15);
+  for (int i = 0; i < count; i++) {
+    buf[i] = analogRead(pin);
+    delayMicroseconds(400);
+  }
+  for (int i = 0; i < count - 1; i++) {
+    for (int j = i + 1; j < count; j++) {
+      if (buf[j] < buf[i]) {
+        int tmp = buf[i];
+        buf[i] = buf[j];
+        buf[j] = tmp;
+      }
+    }
+  }
+  return buf[count / 2];
+}
+
+float getTDSppm(int rawADC, float voltage, float temperatureC) {
+  if (rawADC < TDS_AIR_DEADBAND_RAW) return 0.0; // Probe in air
   float compensationCoefficient = 1.0 + 0.02 * (temperatureC - 25.0);
   float compensationVoltage = voltage / compensationCoefficient;
   float tdsValue = (133.42 * pow(compensationVoltage, 3)
                     - 255.86 * pow(compensationVoltage, 2)
-                    + 857.39 * compensationVoltage) * 0.5;
-  return tdsValue;
+                    + 857.39 * compensationVoltage) * 0.5 * TDS_K_FACTOR;
+  return max(0.0f, tdsValue);
 }
 
-float getClarityPercent(float voltage) {
-  float minV = 1.40;
-  float maxV = 1.70;
-  float percent = ((voltage - minV) / (maxV - minV)) * 100.0;
-  percent = constrain(percent, 0, 100);
+float getClarityPercent(int rawADC) {
+  float span = (float)(TURB_RAW_CLEAR - TURB_RAW_CLOUDY);
+  if (span <= 0) return 0.0;
+  float percent = ((float)(rawADC - TURB_RAW_CLOUDY) / span) * 100.0;
+  percent = constrain(percent, 0.0, 100.0);
   return percent;
 }
 
@@ -81,6 +117,8 @@ void sendReading(float clarityPercent, float tdsPPM, float tempC, float levelPer
 
 void setup() {
   Serial.begin(115200);
+  analogReadResolution(12);
+  analogSetAttenuation(ADC_11db);
   tempSensor.begin();
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
@@ -93,14 +131,19 @@ void setup() {
 }
 
 void loop() {
-  int tdsRaw = analogRead(TDS_PIN);
-  float tdsVoltage = tdsRaw * (3.3 / 4095.0);
+  int tdsRaw = readMedianADC(TDS_PIN, 15);
+  float tdsVoltage = analogReadMilliVolts(TDS_PIN) / 1000.0;
 
-  int turbidityRaw = analogRead(TURBIDITY_PIN);
-  float turbidityVoltage = turbidityRaw * (3.3 / 4095.0);
+  int turbidityRaw = readMedianADC(TURBIDITY_PIN, 15);
+  float turbidityVoltage = analogReadMilliVolts(TURBIDITY_PIN) / 1000.0;
 
   tempSensor.requestTemperatures();
   float tempC = tempSensor.getTempCByIndex(0);
+  if (tempC != DEVICE_DISCONNECTED_C) {
+    lastValidTempC = tempC;
+  } else {
+    tempC = lastValidTempC;
+  }
 
   float distance = getDistanceCM();
   float levelPercent = -1;
@@ -108,41 +151,22 @@ void loop() {
     float waterLevel = TANK_HEIGHT_CM - distance;
     levelPercent = (waterLevel / (TANK_HEIGHT_CM - SENSOR_OFFSET_CM)) * 100.0;
     levelPercent = constrain(levelPercent, 0, 100);
-  }
-
-  float tdsPPM = tempC == DEVICE_DISCONNECTED_C ? 0 : getTDSppm(tdsVoltage, tempC);
-  float clarityPercent = getClarityPercent(turbidityVoltage);
-
-  Serial.println("---- Sensor Readings ----");
-
-  Serial.print("TDS: ");
-  Serial.print(tdsPPM);
-  Serial.println(" ppm");
-
-  Serial.print("Clarity: ");
-  Serial.print(clarityPercent);
-  Serial.println(" %");
-
-  if (tempC == DEVICE_DISCONNECTED_C) {
-    Serial.println("Temperature: Error");
+    lastValidLevelPercent = levelPercent;
   } else {
-    Serial.print("Temperature: ");
-    Serial.print(tempC);
-    Serial.println(" °C");
+    levelPercent = lastValidLevelPercent;
   }
 
-  if (levelPercent == -1) {
-    Serial.println("Water Level: No echo - check wiring/range");
-  } else {
-    Serial.print("Water Level: ");
-    Serial.print(levelPercent);
-    Serial.println(" %");
-  }
+  float tdsPPM = getTDSppm(tdsRaw, tdsVoltage, tempC);
+  float clarityPercent = getClarityPercent(turbidityRaw);
 
-  if (tempC != DEVICE_DISCONNECTED_C && levelPercent != -1) {
-    sendReading(clarityPercent, tdsPPM, tempC, levelPercent);
-  }
+  Serial.println("---- Sensor Readings (3.3V Calibrated) ----");
+  Serial.print("TDS: Raw="); Serial.print(tdsRaw); Serial.print(" -> "); Serial.print(tdsPPM); Serial.println(" ppm");
+  Serial.print("Clarity: Raw="); Serial.print(turbidityRaw); Serial.print(" -> "); Serial.print(clarityPercent); Serial.println(" %");
+  Serial.print("Temperature: "); Serial.print(tempC); Serial.println(" °C");
+  Serial.print("Water Level: "); Serial.print(levelPercent); Serial.println(" %");
 
-  Serial.println("--------------------------");
+  sendReading(clarityPercent, tdsPPM, tempC, levelPercent);
+
+  Serial.println("-------------------------------------------");
   delay(5000);
 }
