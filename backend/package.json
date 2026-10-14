@@ -5,11 +5,13 @@
   "scripts": {
     "start": "node src/server.js",
     "demo": "node src/server.js --demo",
+    "usb": "node src/server.js --usb",
     "dev": "nodemon src/server.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "serialport": "^12.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"

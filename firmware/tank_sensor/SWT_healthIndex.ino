@@ -3,6 +3,9 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 
+// false = send readings over the USB cable only (run `npm run usb` in backend/); true = also POST over Wi-Fi.
+const bool USE_WIFI = false;
+
 const char* ssid = "YOUR_WIFI_SSID";
 const char* password = "YOUR_WIFI_PASSWORD";
 const char* serverUrl = "http://YOUR_BACKEND_IP:3001/api/readings";
@@ -91,15 +94,6 @@ float getDistanceCM() {
 }
 
 void sendReading(float clarityPercent, float tdsPPM, float tempC, float levelPercent) {
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("WiFi not connected");
-    return;
-  }
-
-  HTTPClient http;
-  http.begin(serverUrl);
-  http.addHeader("Content-Type", "application/json");
-
   String payload = "{";
   payload += "\"deviceId\":\"" + String(deviceId) + "\",";
   payload += "\"clarity\":" + String(clarityPercent, 2) + ",";
@@ -108,10 +102,22 @@ void sendReading(float clarityPercent, float tdsPPM, float tempC, float levelPer
   payload += "\"level\":" + String(levelPercent, 2);
   payload += "}";
 
+  // One machine-readable line for the backend's USB bridge.
+  Serial.print("DATA ");
+  Serial.println(payload);
+
+  if (!USE_WIFI) return;
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi not connected");
+    return;
+  }
+
+  HTTPClient http;
+  http.begin(serverUrl);
+  http.addHeader("Content-Type", "application/json");
   int responseCode = http.POST(payload);
   Serial.print("POST response: ");
   Serial.println(responseCode);
-  Serial.println(payload);
   http.end();
 }
 
@@ -122,12 +128,14 @@ void setup() {
   tempSensor.begin();
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
+  if (USE_WIFI) {
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED) {
+      delay(500);
+      Serial.print(".");
+    }
+    Serial.println("\nWiFi connected");
   }
-  Serial.println("\nWiFi connected");
 }
 
 void loop() {
