@@ -30,3 +30,9 @@ export async function fetchLatestReading(): Promise<TankReading | null> {
   if (!res.ok) return null;
   return res.json();
 }
+
+export async function fetchHistory(): Promise<TankReading[]> {
+  const res = await fetch(`${BASE_URL}/api/readings/history`);
+  if (!res.ok) return [];
+  return res.json();
+}
