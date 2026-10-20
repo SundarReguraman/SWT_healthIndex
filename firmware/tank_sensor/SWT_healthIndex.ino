@@ -25,7 +25,8 @@ const float TANK_HEIGHT_CM = 100.0;
 const float SENSOR_OFFSET_CM = 22.0;
 
 // ----- 3.3V Hardware Calibration Constants (12-bit ADC: 0-4095) -----
-// Turbidity (GPIO 34, module powered from 3.3V, A pin straight to GPIO 34):
+// Turbidity (GPIO 34, module powered from 5V; analog out -> 1k -> GPIO 34, 2k from GPIO 34 to GND,
+// so ~4.5V max becomes ~3V). The divider cancels out of the ratio below, so it needs no correction:
 // raw count with the probe in clean drinking water, measured on this board. Clarity is reported as
 // raw / TURB_RAW_CLEAR (the share of light still getting through compared with clean water), so this
 // one reading is the only calibration needed. Re-measure it if the supply voltage or probe changes.

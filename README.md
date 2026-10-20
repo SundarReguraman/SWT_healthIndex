@@ -223,7 +223,7 @@ after it is plugged back in. Without a board: `npm run demo` (or `--demo=attenti
 | Sensor | ESP32 pin | Notes |
 |---|---|---|
 | TDS | GPIO 35 (ADC1) | VCC 3.3 V, GND, signal → GPIO 35 |
-| Turbidity | GPIO 34 (ADC1) | VCC 5 V, GND, analog out → GPIO 34 |
+| Turbidity | GPIO 34 (ADC1) | VCC 5 V, GND. Analog out → **1 kΩ → GPIO 34**, and **2 kΩ from GPIO 34 to GND**. The output reaches ~4.5 V; never wire it straight to the 3.3 V pin. |
 | DS18B20 | GPIO 4 | 4.7 kΩ between data and 3.3 V |
 | Ultrasonic | Trig GPIO 5, Echo GPIO 18 | Echo through 1 kΩ, 2 kΩ from GPIO 18 to GND (5 V → 3.3 V) |
 
