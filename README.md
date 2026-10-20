@@ -170,7 +170,7 @@ This is the same path a real board takes from the bridge onwards.
 1. Flash the firmware (see below) with `USE_WIFI = false`.
 2. Open the Arduino Serial Monitor at 115200 baud and check the output:
    ```
-   ---- Reading #12 (3.3V calibrated) ----
+   ---- Reading #12 ----
    TDS: 412 mV -> 203.50 ppm
    Clarity: Raw=2181 -> 99.00 %
    Temperature: 27.12 C
@@ -192,6 +192,21 @@ This is the same path a real board takes from the bridge onwards.
    - Lift the TDS probe out of the water → **Sensor fault**, *TDS probe stopped responding*.
    - Unplug the DS18B20 → temperature shows **No reading**; the score does not change.
    - Unplug the USB cable → *USB disconnected* event, header turns **Sensor offline**; plug it back in and it reconnects by itself.
+
+### Turbidity calibration (clean → cloudy)
+
+Do this once per setup (and again if the sensor, power or probe position changes). Cover the glass and probe from
+room light, and use milk drops for the cloudy sample — cornflour settles within minutes.
+
+1. Put the probe in **clean drinking water** and press the **BOOT** button on the ESP32 (hold it for a second).
+2. The board samples for 5 s, then counts down **30 s**: move the probe into **cloudy water** (e.g. 10 drops of milk in a glass) and hold it still.
+3. It samples the cloudy water for 5 s and saves both readings to flash; they survive restarts.
+
+Each step shows up under **Recent events** on the dashboard and in the backend log (`[calibration] …`), and readings keep
+flowing meanwhile. Afterwards clean water reads 100 % and your cloudy sample reads 90 % (**unfit**), so anything as cloudy
+as that sample triggers *Clean now*. If the cloudy sample isn't measurably cloudier than the clean one, the board says so
+and keeps the previous setting. Without a calibration, clarity falls back to `raw / TURB_RAW_CLEAR`.
+With the Serial Monitor open you can also type `CAL` to start, or `CALRESET` to clear the saved calibration.
 
 ### 5. Real ESP32 over Wi-Fi (optional)
 

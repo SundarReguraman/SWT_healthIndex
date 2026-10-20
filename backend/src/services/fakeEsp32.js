@@ -45,7 +45,7 @@ function firmwareLines(payload) {
   const show = (v, unit) => (v === null ? 'FAULT' : `${v.toFixed(2)}${unit}`);
   const json = JSON.stringify(payload, (k, v) => (typeof v === 'number' && k !== 'seq' ? Number(v.toFixed(2)) : v));
   return [
-    `---- Reading #${payload.seq} (3.3V calibrated) ----`,
+    `---- Reading #${payload.seq} ----`,
     `TDS: ${payload.tds === null ? 4 : Math.round(payload.tds * 1.9)} mV -> ${show(payload.tds, ' ppm')}`,
     `Clarity: Raw=${payload.clarity === null ? 0 : Math.round((payload.clarity / 100) * TURB_RAW_CLEAR)} -> ${show(payload.clarity, ' %')}`,
     `Temperature: ${show(payload.temperature, ' C')}`,

@@ -2,6 +2,7 @@
 #include <DallasTemperature.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <Preferences.h>
 
 // false = send readings over the USB cable only (run `npm run usb` in backend/); true = also POST over Wi-Fi.
 const bool USE_WIFI = false;
@@ -34,6 +35,33 @@ const int TURB_RAW_CLEAR = 2203;
 // Below this the sensor is unplugged or unpowered, not reading dirty water; reported as a fault
 // so a loose cable never shows up as "unfit".
 const int TURB_RAW_FAULT = 30;
+
+// ----- Two-point turbidity calibration (press BOOT, or type CAL in the Serial Monitor) -----
+// Samples clean water for 5 s, gives 30 s to move the probe into cloudy water, samples that for 5 s,
+// and saves both to flash. Clean then reads 100% and the cloudy sample reads CAL_CLOUDY_CLARITY,
+// which sits in the backend's unfit slab (< 93%). This stretches a weak sensor's small clear-to-cloudy
+// change across the slabs. Without a saved calibration, clarity falls back to raw / TURB_RAW_CLEAR.
+// Type CALRESET in the Serial Monitor to go back to that fallback.
+#define CAL_BUTTON_PIN 0                  // BOOT button on ESP32 dev boards
+const unsigned long CAL_SAMPLE_MS = 5000;
+const unsigned long CAL_SWAP_MS = 30000;
+const float CAL_CLOUDY_CLARITY = 90.0;
+const int CAL_MIN_GAP_RAW = 30;           // cloudy must read at least this much below clean
+Preferences prefs;
+int calClearRaw = 0;                      // 0 = no saved calibration
+int calCloudyRaw = 0;
+
+enum CalState { CAL_IDLE, CAL_CLEAN, CAL_SWAP, CAL_CLOUDY };
+CalState calState = CAL_IDLE;
+unsigned long calStateStart = 0;
+long calSum = 0;
+int calCount = 0;
+int calCleanSample = 0;
+int calLastAnnounced = 0;
+
+const unsigned long READING_INTERVAL_MS = 5000;
+unsigned long lastReadingAt = 0;
+bool buttonWasDown = false;
 
 // TDS (GPIO 35 @ 3.3V): probe cell constant K-factor & air deadband
 const float TDS_K_FACTOR = 1.00;
@@ -82,8 +110,107 @@ float getTDSppm(int milliVolts, float temperatureC) {
 
 float getClarityPercent(int rawADC) {
   if (rawADC < TURB_RAW_FAULT) return NAN; // Sensor disconnected
-  float percent = ((float)rawADC / TURB_RAW_CLEAR) * 100.0;
+  float percent;
+  if (calClearRaw > 0) {
+    // Straight line through the two saved samples: clean = 100%, cloudy = CAL_CLOUDY_CLARITY.
+    float drop = (float)(calClearRaw - rawADC) / (calClearRaw - calCloudyRaw);
+    percent = 100.0 - drop * (100.0 - CAL_CLOUDY_CLARITY);
+  } else {
+    percent = ((float)rawADC / TURB_RAW_CLEAR) * 100.0;
+  }
   return constrain(percent, 0.0, 100.0); // Slightly clearer than the reference still reads 100%
+}
+
+// "CAL <info|done|fail> <text>" lines; the backend's USB bridge turns them into dashboard events.
+void calMessage(const char* kind, const String& text) {
+  Serial.print("CAL ");
+  Serial.print(kind);
+  Serial.print(" ");
+  Serial.println(text);
+}
+
+void loadCalibration() {
+  prefs.begin("turbidity", false);
+  int clear = prefs.getInt("clear", 0);
+  int cloudy = prefs.getInt("cloudy", 0);
+  if (clear - cloudy >= CAL_MIN_GAP_RAW && cloudy >= TURB_RAW_FAULT) {
+    calClearRaw = clear;
+    calCloudyRaw = cloudy;
+    calMessage("info", "Using saved turbidity calibration: clean raw " + String(clear) + ", cloudy raw " + String(cloudy));
+  } else {
+    calMessage("info", "No turbidity calibration saved - using clean-water reference " + String(TURB_RAW_CLEAR) + ". Press BOOT to calibrate");
+  }
+}
+
+void startCalibration() {
+  calState = CAL_CLEAN;
+  calStateStart = millis();
+  calSum = 0;
+  calCount = 0;
+  calMessage("info", "Calibration started - keep the probe in CLEAN water (sampling 5 s)");
+}
+
+void resetCalibration() {
+  prefs.clear();
+  calClearRaw = 0;
+  calCloudyRaw = 0;
+  calMessage("done", "Calibration cleared - using clean-water reference " + String(TURB_RAW_CLEAR));
+}
+
+void finishCalibration(int clean, int cloudy) {
+  if (clean < TURB_RAW_FAULT || cloudy < TURB_RAW_FAULT) {
+    calMessage("fail", "Calibration failed - turbidity sensor not responding. Kept the previous setting");
+    return;
+  }
+  if (clean - cloudy < CAL_MIN_GAP_RAW) {
+    calMessage("fail", "Calibration failed - cloudy sample (raw " + String(cloudy) + ") is not cloudier than clean (raw " +
+               String(clean) + "). Kept the previous setting");
+    return;
+  }
+  calClearRaw = clean;
+  calCloudyRaw = cloudy;
+  prefs.putInt("clear", clean);
+  prefs.putInt("cloudy", cloudy);
+  calMessage("done", "Turbidity calibrated - clean raw " + String(clean) + " = 100%, cloudy raw " + String(cloudy) + " = " +
+             String(CAL_CLOUDY_CLARITY, 0) + "%");
+}
+
+// Advances the calibration a step at a time so readings keep flowing while it runs.
+void runCalibration() {
+  if (calState == CAL_IDLE) return;
+  unsigned long elapsed = millis() - calStateStart;
+
+  if (calState == CAL_SWAP) {
+    int remaining = (CAL_SWAP_MS - min(elapsed, CAL_SWAP_MS) + 999) / 1000;
+    if (remaining > 0 && remaining % 10 == 0 && remaining != calLastAnnounced) {
+      calLastAnnounced = remaining;
+      calMessage("info", String(remaining) + " s to move the probe into CLOUDY water");
+    }
+    if (elapsed >= CAL_SWAP_MS) {
+      calState = CAL_CLOUDY;
+      calStateStart = millis();
+      calSum = 0;
+      calCount = 0;
+      calMessage("info", "Sampling CLOUDY water for 5 s - hold the probe still");
+    }
+    return;
+  }
+
+  calSum += readMedianADC(TURBIDITY_PIN, 15);
+  calCount++;
+  if (elapsed < CAL_SAMPLE_MS) return;
+
+  int average = calSum / calCount;
+  if (calState == CAL_CLEAN) {
+    calCleanSample = average;
+    calMessage("info", "Clean water captured (raw " + String(average) + ") - move the probe to CLOUDY water now, 30 s");
+    calState = CAL_SWAP;
+    calStateStart = millis();
+    calLastAnnounced = 30;
+  } else {
+    finishCalibration(calCleanSample, average);
+    calState = CAL_IDLE;
+  }
 }
 
 float getDistanceCM() {
@@ -157,6 +284,9 @@ void setup() {
   tempSensor.begin();
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
+  pinMode(CAL_BUTTON_PIN, INPUT_PULLUP);
+  Serial.setTimeout(50);
+  loadCalibration();
   if (USE_WIFI) {
     WiFi.begin(ssid, password);
     while (WiFi.status() != WL_CONNECTED) {
@@ -168,6 +298,27 @@ void setup() {
 }
 
 void loop() {
+  // BOOT button press (or "CAL" typed in the Serial Monitor) starts the two-point calibration.
+  bool buttonDown = digitalRead(CAL_BUTTON_PIN) == LOW;
+  if (buttonDown && !buttonWasDown && calState == CAL_IDLE) startCalibration();
+  buttonWasDown = buttonDown;
+  if (Serial.available()) {
+    String command = Serial.readStringUntil('\n');
+    command.trim();
+    if (command == "CAL" && calState == CAL_IDLE) startCalibration();
+    if (command == "CALRESET") resetCalibration();
+  }
+
+  runCalibration();
+
+  if (lastReadingAt == 0 || millis() - lastReadingAt >= READING_INTERVAL_MS) {
+    lastReadingAt = millis();
+    takeReading();
+  }
+  delay(50);
+}
+
+void takeReading() {
   seq++;
   int tdsMilliVolts = readMedianADC(TDS_PIN, 15, true);
   int turbidityRaw = readMedianADC(TURBIDITY_PIN, 15);
@@ -183,7 +334,7 @@ void loop() {
   float tdsPPM = getTDSppm(tdsMilliVolts, tempC);
   float clarityPercent = getClarityPercent(turbidityRaw);
 
-  Serial.print("---- Reading #"); Serial.print(seq); Serial.println(" (3.3V calibrated) ----");
+  Serial.print("---- Reading #"); Serial.print(seq); Serial.println(" ----");
   Serial.print("TDS: "); Serial.print(tdsMilliVolts); Serial.print(" mV -> "); printValue("", tdsPPM, " ppm");
   Serial.print("Clarity: Raw="); Serial.print(turbidityRaw); Serial.print(" -> "); printValue("", clarityPercent, " %");
   printValue("Temperature: ", tempC, " C");
@@ -192,5 +343,4 @@ void loop() {
   sendReading(clarityPercent, tdsPPM, tempC, levelPercent);
 
   Serial.println("-------------------------------------------");
-  delay(5000);
 }

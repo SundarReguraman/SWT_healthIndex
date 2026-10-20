@@ -50,6 +50,19 @@ test('USB DATA lines go through the same pipeline as Wi-Fi', () => {
   assert.strictEqual(latest.temperature, null);
 });
 
+test('turbidity calibration messages from the board become dashboard events', () => {
+  quiet(() => {
+    handleLine('DATA {"seq":1,"clarity":99,"tds":200,"temperature":25,"level":70}');
+    handleLine('CAL info Calibration started - keep the probe in CLEAN water (sampling 5 s)\r');
+    handleLine('CAL done Turbidity calibrated - clean raw 2203 = 100%, cloudy raw 1950 = 90%\r');
+    handleLine('CAL fail Calibration failed - cloudy sample (raw 2190) is not cloudier than clean (raw 2203)\r');
+  });
+  const [fail, done, info] = store.getEvents();
+  assert.deepStrictEqual([info.tone, done.tone, fail.tone], ['neutral', 'good', 'warn']);
+  assert.match(done.text, /clean raw 2203 = 100%/);
+  assert.strictEqual(store.getLatest().seq, 1); // calibration lines are not readings
+});
+
 test('non-DATA serial lines and broken JSON are ignored', () => {
   quiet(() => {
     handleLine('---- Sensor Readings ----');

@@ -22,8 +22,17 @@ async function findPort() {
   return byName ? byName.path : null;
 }
 
+const CAL_TONES = { info: 'neutral', done: 'good', fail: 'warn' };
+
 function handleLine(line) {
   const trimmed = line.trim();
+  // Turbidity calibration progress: "CAL <info|done|fail> <text>", shown as dashboard events.
+  const cal = trimmed.match(/^CAL (info|done|fail) (.+)$/);
+  if (cal) {
+    console.log(`[calibration] ${cal[2]}`);
+    addEvent('live', CAL_TONES[cal[1]], cal[2]);
+    return;
+  }
   if (!trimmed.startsWith('DATA ')) {
     if (trimmed) console.log(`[esp32] ${trimmed}`);
     return;
