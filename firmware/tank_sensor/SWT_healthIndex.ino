@@ -31,22 +31,23 @@ const int TURB_RAW_CLOUDY = 95;
 
 // TDS (GPIO 35 @ 3.3V): probe cell constant K-factor & air deadband
 const float TDS_K_FACTOR = 1.00;
-const int TDS_AIR_DEADBAND_RAW = 15;
+const int TDS_AIR_DEADBAND_MV = 12; // below this the probe is out of the water
 
-// Cached fallback state so a single missed echo never blocks water-quality POSTs
-float lastValidLevelPercent = 75.0;
-float lastValidTempC = 32.5;
+// A failed sensor is reported as NAN and sent as JSON null, so the backend never scores made-up values.
+// Readings are numbered so the backend log and dashboard can be matched against this serial output.
+unsigned long seq = 0;
 
 // ----- Temperature sensor setup -----
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature tempSensor(&oneWire);
 
-// Median filter over N samples to reject ESP32 Wi-Fi ADC spikes
-int readMedianADC(int pin, int samples = 15) {
+// Median filter over N samples to reject ESP32 Wi-Fi ADC spikes.
+// millivolts = true samples calibrated millivolts instead of raw counts.
+int readMedianADC(int pin, int samples = 15, bool millivolts = false) {
   int buf[15];
   int count = constrain(samples, 3, 15);
   for (int i = 0; i < count; i++) {
-    buf[i] = analogRead(pin);
+    buf[i] = millivolts ? analogReadMilliVolts(pin) : analogRead(pin);
     delayMicroseconds(400);
   }
   for (int i = 0; i < count - 1; i++) {
@@ -61,8 +62,10 @@ int readMedianADC(int pin, int samples = 15) {
   return buf[count / 2];
 }
 
-float getTDSppm(int rawADC, float voltage, float temperatureC) {
-  if (rawADC < TDS_AIR_DEADBAND_RAW) return 0.0; // Probe in air
+float getTDSppm(int milliVolts, float temperatureC) {
+  if (milliVolts < TDS_AIR_DEADBAND_MV) return NAN; // Probe in air
+  if (isnan(temperatureC)) temperatureC = 25.0;     // No temperature: skip compensation
+  float voltage = milliVolts / 1000.0;
   float compensationCoefficient = 1.0 + 0.02 * (temperatureC - 25.0);
   float compensationVoltage = voltage / compensationCoefficient;
   float tdsValue = (133.42 * pow(compensationVoltage, 3)
@@ -87,19 +90,41 @@ float getDistanceCM() {
   digitalWrite(TRIG_PIN, LOW);
 
   long duration = pulseIn(ECHO_PIN, HIGH, 30000);
-  if (duration == 0) return -1;
+  if (duration == 0) return NAN; // No echo
 
   float distance = duration * 0.0343 / 2.0;
+  // Closer than the blind zone or further than the tank floor means a bad echo.
+  if (distance < SENSOR_OFFSET_CM - 5 || distance > TANK_HEIGHT_CM + 5) return NAN;
   return distance;
+}
+
+float readTemperatureC() {
+  tempSensor.requestTemperatures();
+  float t = tempSensor.getTempCByIndex(0);
+  // -127 = disconnected; exactly 85 = power-on reset value, not a real reading.
+  if (t == DEVICE_DISCONNECTED_C || t == 85.0) return NAN;
+  return t;
+}
+
+// JSON number with 2 decimals, or null for a failed sensor.
+String jsonValue(float v) {
+  return isnan(v) ? String("null") : String(v, 2);
+}
+
+void printValue(const char* label, float v, const char* unit) {
+  Serial.print(label);
+  if (isnan(v)) Serial.println("FAULT");
+  else { Serial.print(v); Serial.println(unit); }
 }
 
 void sendReading(float clarityPercent, float tdsPPM, float tempC, float levelPercent) {
   String payload = "{";
   payload += "\"deviceId\":\"" + String(deviceId) + "\",";
-  payload += "\"clarity\":" + String(clarityPercent, 2) + ",";
-  payload += "\"tds\":" + String(tdsPPM, 2) + ",";
-  payload += "\"temperature\":" + String(tempC, 2) + ",";
-  payload += "\"level\":" + String(levelPercent, 2);
+  payload += "\"seq\":" + String(seq) + ",";
+  payload += "\"clarity\":" + jsonValue(clarityPercent) + ",";
+  payload += "\"tds\":" + jsonValue(tdsPPM) + ",";
+  payload += "\"temperature\":" + jsonValue(tempC) + ",";
+  payload += "\"level\":" + jsonValue(levelPercent);
   payload += "}";
 
   // One machine-readable line for the backend's USB bridge.
@@ -139,39 +164,26 @@ void setup() {
 }
 
 void loop() {
-  int tdsRaw = readMedianADC(TDS_PIN, 15);
-  float tdsVoltage = analogReadMilliVolts(TDS_PIN) / 1000.0;
-
+  seq++;
+  int tdsMilliVolts = readMedianADC(TDS_PIN, 15, true);
   int turbidityRaw = readMedianADC(TURBIDITY_PIN, 15);
-  float turbidityVoltage = analogReadMilliVolts(TURBIDITY_PIN) / 1000.0;
-
-  tempSensor.requestTemperatures();
-  float tempC = tempSensor.getTempCByIndex(0);
-  if (tempC != DEVICE_DISCONNECTED_C) {
-    lastValidTempC = tempC;
-  } else {
-    tempC = lastValidTempC;
-  }
+  float tempC = readTemperatureC();
 
   float distance = getDistanceCM();
-  float levelPercent = -1;
-  if (distance != -1) {
+  float levelPercent = NAN;
+  if (!isnan(distance)) {
     float waterLevel = TANK_HEIGHT_CM - distance;
-    levelPercent = (waterLevel / (TANK_HEIGHT_CM - SENSOR_OFFSET_CM)) * 100.0;
-    levelPercent = constrain(levelPercent, 0, 100);
-    lastValidLevelPercent = levelPercent;
-  } else {
-    levelPercent = lastValidLevelPercent;
+    levelPercent = constrain((waterLevel / (TANK_HEIGHT_CM - SENSOR_OFFSET_CM)) * 100.0, 0, 100);
   }
 
-  float tdsPPM = getTDSppm(tdsRaw, tdsVoltage, tempC);
+  float tdsPPM = getTDSppm(tdsMilliVolts, tempC);
   float clarityPercent = getClarityPercent(turbidityRaw);
 
-  Serial.println("---- Sensor Readings (3.3V Calibrated) ----");
-  Serial.print("TDS: Raw="); Serial.print(tdsRaw); Serial.print(" -> "); Serial.print(tdsPPM); Serial.println(" ppm");
-  Serial.print("Clarity: Raw="); Serial.print(turbidityRaw); Serial.print(" -> "); Serial.print(clarityPercent); Serial.println(" %");
-  Serial.print("Temperature: "); Serial.print(tempC); Serial.println(" °C");
-  Serial.print("Water Level: "); Serial.print(levelPercent); Serial.println(" %");
+  Serial.print("---- Reading #"); Serial.print(seq); Serial.println(" (3.3V calibrated) ----");
+  Serial.print("TDS: "); Serial.print(tdsMilliVolts); Serial.print(" mV -> "); printValue("", tdsPPM, " ppm");
+  Serial.print("Clarity: Raw="); Serial.print(turbidityRaw); Serial.print(" -> "); printValue("", clarityPercent, " %");
+  printValue("Temperature: ", tempC, " C");
+  printValue("Water Level: ", levelPercent, " %");
 
   sendReading(clarityPercent, tdsPPM, tempC, levelPercent);
 

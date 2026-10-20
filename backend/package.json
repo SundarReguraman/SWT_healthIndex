@@ -6,7 +6,9 @@
     "start": "node src/server.js",
     "demo": "node src/server.js --demo",
     "usb": "node src/server.js --usb",
-    "dev": "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+    "simulate": "node scripts/simulate.js",
+    "test": "node --test"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -15,5 +17,8 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

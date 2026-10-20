@@ -1,19 +1,21 @@
-// Demo data source: one reading per minute, used when no ESP32 is posting.
-// Every value is a pure function of the clock, so restarts resume the same series
-// (no state file needed) and the history can be backfilled with real timestamps.
+// Demo data source: one reading per minute, for presentations without an ESP32.
+// Every value is a pure function of the clock, so restarts resume the same series and the history
+// can be backfilled with real timestamps. Demo readings go to their own stream in the store and are
+// only shown while no live device is posting.
 const { computeScores } = require('./scoring');
-const { saveReading, getHistory, getLastLiveAt } = require('./store');
+const { saveReading } = require('./store');
 
 const MINUTE = 60_000;
 const BACKFILL_MINUTES = 60;
-const LIVE_GRACE_MS = 2 * MINUTE; // pause the demo while a real device is posting
 
 // Shift the water-quality baseline to show other dashboard states on demand.
 const PROFILES = {
-  good: { clarity: 0, tds: 0, temperature: 0 },
-  attention: { clarity: -26, tds: 0, temperature: 0 },
-  critical: { clarity: -45, tds: 0, temperature: 0 },
+  good: { clarity: 0, tds: 0 },
+  attention: { clarity: -26, tds: 0 },
+  critical: { clarity: -45, tds: 0 },
 };
+
+let enabled = false;
 
 // Deterministic pseudo-random in [-1, 1] for an integer knot and channel.
 function hash(n, channel) {
@@ -50,15 +52,16 @@ function demoReading(t, profile) {
 
   const clarity = 97 - 6 * weekPhase + 0.4 * smoothNoise(t, 15, 1) + p.clarity;
   const tds = 212 + 18 * Math.sin((2 * Math.PI * day) / 3) + 3 * smoothNoise(t, 20, 2) + p.tds;
-  const temperature = 29 + 3 * Math.sin((2 * Math.PI * (hourOfDay(t) - 9)) / 24) + 0.2 * smoothNoise(t, 10, 3) + p.temperature;
+  const temperature = 29 + 3 * Math.sin((2 * Math.PI * (hourOfDay(t) - 9)) / 24) + 0.2 * smoothNoise(t, 10, 3);
   const level = tankLevel(t) + 0.5 * smoothNoise(t, 10, 4);
 
   const round1 = (v) => Math.round(v * 10) / 10;
   const reading = {
     deviceId: 'tank-1',
+    seq: null,
     source: 'demo',
+    via: 'demo',
     clarity: round1(Math.min(100, Math.max(0, clarity))),
-    turbidity: null,
     tds: Math.round(tds),
     temperature: round1(temperature),
     level: round1(Math.min(100, Math.max(0, level))),
@@ -68,27 +71,27 @@ function demoReading(t, profile) {
 }
 
 function startDemo(profile = 'good') {
+  if (!PROFILES[profile]) {
+    console.log(`Unknown demo profile "${profile}" — use good, attention or critical. Falling back to good.`);
+    profile = 'good';
+  }
+  enabled = true;
   const now = Date.now();
   const thisMinute = now - (now % MINUTE);
+  for (let i = BACKFILL_MINUTES; i >= 0; i--) saveReading(demoReading(thisMinute - i * MINUTE, profile));
 
-  if (getHistory().length === 0) {
-    for (let i = BACKFILL_MINUTES; i >= 0; i--) saveReading(demoReading(thisMinute - i * MINUTE, profile));
-  }
-
-  const tick = () => {
-    const t = Date.now() - (Date.now() % MINUTE);
-    const lastLive = getLastLiveAt();
-    if (lastLive && Date.now() - lastLive < LIVE_GRACE_MS) return;
-    saveReading(demoReading(t, profile));
-  };
-
+  const tick = () => saveReading(demoReading(Date.now() - (Date.now() % MINUTE), profile));
   // Align ticks to wall-clock minute boundaries.
   setTimeout(() => {
     tick();
     setInterval(tick, MINUTE);
   }, MINUTE - (now % MINUTE));
 
-  console.log(`Demo data enabled (profile: ${profile}) — one reading per minute, paused while a live device is posting`);
+  console.log(`Demo data enabled (profile: ${profile}) — one reading per minute, hidden while a live device is posting`);
 }
 
-module.exports = { startDemo, demoReading };
+function isDemoEnabled() {
+  return enabled;
+}
+
+module.exports = { startDemo, demoReading, isDemoEnabled };

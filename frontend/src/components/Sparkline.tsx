@@ -1,34 +1,47 @@
 interface SparklineProps {
-  values: number[];
+  values: (number | null)[];
   color: string;
   // Smallest vertical range drawn, so sensor noise doesn't fill the whole chart.
   minSpan: number;
 }
 
 export function Sparkline({ values, color, minSpan }: SparklineProps) {
-  if (values.length < 2) return <div className="h-8" />;
+  const present = values.filter((v): v is number => v !== null);
+  if (present.length < 2) return <div className="h-10" />;
 
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  const min = Math.min(...present);
+  const max = Math.max(...present);
   const span = Math.max(max - min, minSpan);
   const lo = (min + max) / 2 - span / 2;
-  const points = values.map((v, i) => {
+
+  // A missing reading breaks the line instead of drawing through it.
+  const segments: string[][] = [[]];
+  values.forEach((v, i) => {
+    if (v === null) {
+      if (segments[segments.length - 1].length) segments.push([]);
+      return;
+    }
     const x = (i / (values.length - 1)) * 100;
-    const y = 28 - ((v - lo) / span) * 24;
-    return `${x.toFixed(2)},${y.toFixed(2)}`;
+    const y = 30 - ((v - lo) / span) * 28;
+    segments[segments.length - 1].push(`${x.toFixed(2)},${y.toFixed(2)}`);
   });
 
   return (
-    <svg viewBox="0 0 100 32" preserveAspectRatio="none" className="h-8 w-full" aria-hidden>
-      <polyline
-        points={points.join(' ')}
-        fill="none"
-        stroke={color}
-        strokeWidth={1.5}
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        vectorEffect="non-scaling-stroke"
-      />
+    <svg viewBox="0 0 100 32" preserveAspectRatio="none" className="block h-10 w-full" aria-hidden>
+      {segments
+        .filter((s) => s.length > 1)
+        .map((s, i) => (
+          <polyline
+            key={i}
+            points={s.join(' ')}
+            fill="none"
+            stroke={color}
+            strokeWidth={1.6}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
     </svg>
   );
 }
