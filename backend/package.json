@@ -8,7 +8,7 @@
     "usb": "node src/server.js --usb",
     "dev": "nodemon src/server.js",
     "simulate": "node scripts/simulate.js",
-    "test": "node --test",
+    "test": "node --test test/scoring.test.js test/pipeline.test.js",
     "usb:rehearse": "node src/server.js --usb=mock"
   },
   "dependencies": {
