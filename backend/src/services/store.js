@@ -1,5 +1,7 @@
 // In-memory store. Live (device) and demo readings are kept in separate streams so demo data can never
 // leak into a live dashboard: the "active" stream is live whenever a device has posted recently.
+const CONFIG = require('../config/thresholds');
+
 const MINUTE = 60_000;
 const RETENTION_MS = 24 * 60 * MINUTE;
 const MAX_READINGS = 20_000; // ~24 h at one reading every 5 s
@@ -48,10 +50,10 @@ function recordEvents(source, prev, r) {
 
   const prevFlags = prev ? prev.flaggedParams : [];
   if (r.flaggedParams.includes('clarity') && !prevFlags.includes('clarity')) {
-    addEvent(source, 'bad', `Unsafe clarity (${r.clarity.toFixed(0)}%) — below the 60% limit`, t);
+    addEvent(source, 'bad', `Unsafe clarity (${r.clarity.toFixed(1)}%) — below the ${CONFIG.clarity.unsafeMin}% limit`, t);
   }
   if (r.flaggedParams.includes('tds') && !prevFlags.includes('tds')) {
-    addEvent(source, 'bad', `Unsafe TDS (${r.tds.toFixed(0)} ppm) — at or above the 1000 ppm limit`, t);
+    addEvent(source, 'bad', `Unsafe TDS (${r.tds.toFixed(0)} ppm) — at or above the ${CONFIG.tds.unsafeMax} ppm limit`, t);
   }
   for (const p of prevFlags) {
     if (!r.flaggedParams.includes(p)) addEvent(source, 'good', `${p === 'tds' ? 'TDS' : 'Clarity'} back within the safe limit`, t);

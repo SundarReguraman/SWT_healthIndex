@@ -101,7 +101,9 @@ function computeScores(reading) {
   if (reading.clarity < CONFIG.clarity.unsafeMin) flaggedParams.push('clarity');
   if (reading.tds >= CONFIG.tds.unsafeMax) flaggedParams.push('tds');
   const hasHardFlag = flaggedParams.length > 0;
-  const hasPoorSubScore = clarityScore < 50 || tdsScore < 50;
+  // Any clarity below the safe slab means turbidity was detected, so it can never be GOOD.
+  const clarityNotSafe = reading.clarity < CONFIG.clarity.idealMin;
+  const hasPoorSubScore = clarityScore < 50 || tdsScore < 50 || clarityNotSafe;
 
   let composite = rawComposite;
   let capReason = null;
@@ -111,7 +113,7 @@ function computeScores(reading) {
     capReason = `Unsafe ${names.join(' and ')} reading caps the score at ${zones.hardFlagCap}`;
   } else if (!hasHardFlag && hasPoorSubScore && rawComposite > zones.poorParamCap) {
     composite = zones.poorParamCap;
-    capReason = `A poor ${clarityScore < 50 ? 'clarity' : 'TDS'} reading caps the score at ${zones.poorParamCap}`;
+    capReason = `A ${clarityNotSafe ? 'cloudy clarity' : 'poor TDS'} reading caps the score at ${zones.poorParamCap}`;
   }
 
   let zone = 'GOOD';
@@ -122,10 +124,10 @@ function computeScores(reading) {
   const causes = [];
   const c = reading.clarity.toFixed(0);
   const d = reading.tds.toFixed(0);
-  if (flaggedParams.includes('clarity')) causes.push(`Water is visibly cloudy (${c}%) — drain and scrub the tank to remove settled bottom sludge.`);
-  if (flaggedParams.includes('tds')) causes.push(`Very high dissolved solids (${d} ppm) — exceeds the 1000 ppm safe limit; check the supply or RO membrane.`);
-  if (!flaggedParams.includes('clarity') && clarityScore < 50) causes.push(`Water is getting cloudy (${c}%) — fine silt or sediment is building up at the tank bottom.`);
-  if (!flaggedParams.includes('tds') && tdsScore < 50) causes.push(`Dissolved minerals (${d} ppm) are above the 500 ppm BIS acceptable limit.`);
+  if (flaggedParams.includes('clarity')) causes.push(`Water is cloudy (${c}% clarity, below ${CONFIG.clarity.unsafeMin}%) — unfit for drinking; drain and scrub the tank.`);
+  if (flaggedParams.includes('tds')) causes.push(`Very high dissolved solids (${d} ppm) — exceeds the ${CONFIG.tds.unsafeMax} ppm safe limit; check the supply or RO membrane.`);
+  if (!flaggedParams.includes('clarity') && clarityNotSafe) causes.push(`Slight cloudiness detected (${c}% clarity, safe is ${CONFIG.clarity.idealMin}% or more) — recheck, and plan a tank clean if it stays low.`);
+  if (!flaggedParams.includes('tds') && tdsScore < 50) causes.push(`Dissolved minerals (${d} ppm) are above the ${CONFIG.tds.acceptableMax} ppm BIS acceptable limit.`);
   if (causes.length === 0 && zone !== 'GOOD') causes.push('Clarity and TDS are both only fair — plan a routine clean.');
   if (causes.length === 0) causes.push('Clarity and TDS are within WHO and BIS drinking-water limits.');
 

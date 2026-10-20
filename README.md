@@ -44,9 +44,11 @@ End-to-end drinking-water storage tank monitor:
 
 | Parameter | Ideal | Acceptable | Poor | Unsafe (hard flag) |
 |---|---|---|---|---|
-| Clarity | ≥ 90 % | 75–89 % | 60–74 % | < 60 % |
+| Clarity (% of clean-water reading) | ≥ 97 % | 95–96.9 % | 93–94.9 % | < 93 % |
 | TDS | 50–300 ppm | 301–500 ppm | 501–999 ppm | ≥ 1000 ppm |
 
+- Clarity has three slabs: **≥ 97 % safe**, **93–96.9 % needs attention**, **< 93 % unfit**. Any clarity below 97 % means
+  turbidity was detected, so it can never average up to *Good*. Why the numbers sit so close to 100 %: [docs/thresholds.md](docs/thresholds.md).
 - An unsafe reading caps the score at **39** (*Clean now*); a poor one caps it at **74** (*Needs attention*).
 - Zones: **75–100 Good**, **45–74 Needs attention**, **0–44 Clean now**.
 - Missing clarity or TDS → **Sensor fault**, no score.
@@ -125,7 +127,7 @@ Work through these in order; each step proves one more link of the chain.
 ```bash
 cd backend && npm test
 ```
-21 tests should pass: sub-scores and band edges, caps, zones, temperature having no effect, sensor faults,
+22 tests should pass: sub-scores and band edges, caps, zones, temperature having no effect, sensor faults,
 payload validation, the USB line parser on real firmware output, demo/live separation, events and history averaging.
 
 ### 2. Backend + dashboard — simulated device
@@ -135,7 +137,7 @@ payload validation, the USB line parser on real firmware output, demo/live separ
 2. In a third terminal: `cd backend && npm run simulate`.
    Each line prints the reading, the score and zone the backend returned, and `ok` or `MISMATCH`:
    ```
-   #5 Early silt build-up    clarity=69.7 tds=243 level=62.1 → score 60 SCHEDULE_MAINTENANCE (ok)
+   #5 Slight cloudiness      clarity=95.6 tds=243 level=62.1 → score 71 SCHEDULE_MAINTENANCE (ok)
    ```
 3. On the dashboard check that:
    - the header shows **Live · WIFI** and **Reading #N** matching the simulator's latest `#N`;
@@ -170,17 +172,17 @@ This is the same path a real board takes from the bridge onwards.
    ```
    ---- Reading #12 (3.3V calibrated) ----
    TDS: 412 mV -> 203.50 ppm
-   Clarity: Raw=760 -> 94.31 %
+   Clarity: Raw=2181 -> 99.00 %
    Temperature: 27.12 C
    Water Level: 64.10 %
-   DATA {"deviceId":"tank-1","seq":12,"clarity":94.31,"tds":203.50,"temperature":27.12,"level":64.10}
+   DATA {"deviceId":"tank-1","seq":12,"clarity":99.00,"tds":203.50,"temperature":27.12,"level":64.10}
    ```
    A disconnected sensor prints `FAULT` and is sent as `null`.
 3. **Close the Serial Monitor** (only one program can hold the port), then `cd backend && npm run usb`.
    Opening the port resets most ESP32 dev boards, so the reading number starts again at `#1` — that's expected.
    The backend logs `[usb] Connected to /dev/cu.usbserial-…` and one line per reading:
    ```
-   [usb] #12 clarity=94.31% tds=203.5ppm temp=27.12°C level=64.1% → score 88 GOOD
+   [usb] #12 clarity=99% tds=203.5ppm temp=27.12°C level=64.1% → score 91 GOOD
    ```
 4. On the dashboard: the header shows **Live · USB**, a **USB /dev/…** chip, and **Reading #N** equal to the
    backend log's `#N`. If they match, the dashboard is in sync with what the sensors are reading.

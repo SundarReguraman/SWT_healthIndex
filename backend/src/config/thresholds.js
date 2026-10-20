@@ -3,11 +3,19 @@
 // Temperature is recorded (the firmware uses it for TDS compensation) but is not part of the score.
 
 module.exports = {
+  // Clarity = light received by the turbidity sensor as a % of the same sensor in clean drinking water
+  // (firmware TURB_RAW_CLEAR). Guideline limits: BIS IS 10500 1 NTU acceptable / 5 NTU permissible;
+  // US EPA and EU treated water <= 0.3 NTU (95% of samples), never > 1 NTU; WHO: < 1 NTU for effective
+  // disinfection, ~5 NTU visible. A low-cost optical sensor cannot resolve 1-5 NTU: on the manufacturer's
+  // SEN0189 curve a drop of a few % below clean water is already hundreds of NTU. So the safe slab is "no
+  // turbidity detectable", unfit is any clear drop, and the narrow band between absorbs sensor noise and
+  // drift so it asks for a recheck instead of raising a false "unfit".
   clarity: {
     unit: '%',
-    idealMin: 90,        // >= 90% (~ <= 1 NTU BIS acceptable) -> Sub-score 80-100
-    acceptableMin: 75,   // 75-89% (~ 1-5 NTU BIS permissible) -> Sub-score 50-79
-    unsafeMin: 60,       // 60-74% (~ 5-10 NTU) -> Sub-score 20-49; < 60% (visible sludge) -> Hard Flag
+    idealMin: 97,        // >= 97%: SAFE — indistinguishable from clean water        -> Sub-score 80-100
+    acceptableMin: 95,   // 95-96.9%: NEEDS ATTENTION (slight drop)                 -> Sub-score 50-79
+    unsafeMin: 93,       // 93-94.9%: NEEDS ATTENTION (drop beyond noise)           -> Sub-score 20-49
+                         // < 93%: UNFIT — clearly turbid, far above 5 NTU          -> Hard Flag
   },
   tds: {
     unit: 'ppm',

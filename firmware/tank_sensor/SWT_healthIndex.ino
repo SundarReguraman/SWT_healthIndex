@@ -25,11 +25,13 @@ const float TANK_HEIGHT_CM = 100.0;
 const float SENSOR_OFFSET_CM = 22.0;
 
 // ----- 3.3V Hardware Calibration Constants (12-bit ADC: 0-4095) -----
-// Turbidity (GPIO 34 @ 3.3V): ~800+ raw counts in clear water, ~95 in cloudy water
-const int TURB_RAW_CLEAR = 800;
-const int TURB_RAW_CLOUDY = 95;
+// Turbidity (GPIO 34, module powered from 3.3V, A pin straight to GPIO 34):
+// raw count with the probe in clean drinking water, measured on this board. Clarity is reported as
+// raw / TURB_RAW_CLEAR (the share of light still getting through compared with clean water), so this
+// one reading is the only calibration needed. Re-measure it if the supply voltage or probe changes.
+const int TURB_RAW_CLEAR = 2203;
 // Below this the sensor is unplugged or unpowered, not reading dirty water; reported as a fault
-// so a loose cable never shows up as "Clean now". Keep it well under TURB_RAW_CLOUDY.
+// so a loose cable never shows up as "unfit".
 const int TURB_RAW_FAULT = 30;
 
 // TDS (GPIO 35 @ 3.3V): probe cell constant K-factor & air deadband
@@ -79,11 +81,8 @@ float getTDSppm(int milliVolts, float temperatureC) {
 
 float getClarityPercent(int rawADC) {
   if (rawADC < TURB_RAW_FAULT) return NAN; // Sensor disconnected
-  float span = (float)(TURB_RAW_CLEAR - TURB_RAW_CLOUDY);
-  if (span <= 0) return 0.0;
-  float percent = ((float)(rawADC - TURB_RAW_CLOUDY) / span) * 100.0;
-  percent = constrain(percent, 0.0, 100.0);
-  return percent;
+  float percent = ((float)rawADC / TURB_RAW_CLEAR) * 100.0;
+  return constrain(percent, 0.0, 100.0); // Slightly clearer than the reference still reads 100%
 }
 
 float getDistanceCM() {

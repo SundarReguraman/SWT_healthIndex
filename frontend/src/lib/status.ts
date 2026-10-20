@@ -49,12 +49,15 @@ export interface Scale {
 }
 
 // Threshold scales drawn under each quality tile, built from the backend's live config.
+// The slabs sit close together near 100%, so the scale is zoomed to show them; anything lower is
+// already unfit and pins to the left edge.
 export function clarityScale(c: ScoringConfig['clarity']): Scale {
+  const min = Math.max(0, c.unsafeMin - 2 * (c.idealMin - c.unsafeMin));
   return {
-    min: 0,
+    min,
     max: 100,
     bands: [
-      { from: 0, to: c.unsafeMin, kind: 'unsafe' },
+      { from: min, to: c.unsafeMin, kind: 'unsafe' },
       { from: c.unsafeMin, to: c.acceptableMin, kind: 'poor' },
       { from: c.acceptableMin, to: c.idealMin, kind: 'fair' },
       { from: c.idealMin, to: 100, kind: 'ideal' },

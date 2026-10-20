@@ -15,7 +15,7 @@ const quiet = (fn) => {
     console.log = log;
   }
 };
-const reading = (extra = {}) => ({ deviceId: 'tank-1', clarity: 95, tds: 210, temperature: 28, level: 80, ...extra });
+const reading = (extra = {}) => ({ deviceId: 'tank-1', clarity: 99, tds: 210, temperature: 28, level: 80, ...extra });
 
 test.beforeEach(() => store.reset());
 
@@ -42,7 +42,7 @@ test('a rejected reading is not stored', () => {
 });
 
 test('USB DATA lines go through the same pipeline as Wi-Fi', () => {
-  quiet(() => handleLine('DATA {"deviceId":"tank-1","seq":42,"clarity":91.5,"tds":230,"temperature":null,"level":64}\r'));
+  quiet(() => handleLine('DATA {"deviceId":"tank-1","seq":42,"clarity":98.5,"tds":230,"temperature":null,"level":64}\r'));
   const latest = store.getLatest();
   assert.strictEqual(latest.via, 'usb');
   assert.strictEqual(latest.seq, 42);
@@ -98,13 +98,13 @@ test('events record zone changes, hard flags and sensor dropouts', () => {
     ingestReading(reading(), 'wifi');
     ingestReading(reading({ clarity: 45 }), 'wifi');
     ingestReading(reading({ clarity: 45, level: null }), 'wifi');
-    ingestReading(reading({ clarity: 95, level: 80 }), 'wifi');
+    ingestReading(reading({ clarity: 99, level: 80 }), 'wifi');
   });
   const texts = store.getEvents().map((e) => e.text).reverse();
   assert.deepStrictEqual(texts, [
     'First reading received via wifi',
     'Water quality changed: Good → Clean now',
-    'Unsafe clarity (45%) — below the 60% limit',
+    'Unsafe clarity (45.0%) — below the 93% limit',
     'Level sensor stopped responding',
     'Water quality changed: Clean now → Good',
     'Clarity back within the safe limit',

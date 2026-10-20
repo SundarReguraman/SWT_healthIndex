@@ -4,17 +4,18 @@
 
 // `expect` is the zone the backend should return for the scenario.
 const SCENARIOS = [
-  { name: 'Clean water', expect: 'GOOD', clarity: 95, tds: 185, temperature: 24, level: 88 },
-  { name: 'Early silt build-up', expect: 'SCHEDULE_MAINTENANCE', clarity: 70, tds: 240, temperature: 27, level: 62 },
-  { name: 'Hard borewell water', expect: 'SCHEDULE_MAINTENANCE', clarity: 93, tds: 760, temperature: 27, level: 45 },
-  { name: 'Unsafe TDS intrusion', expect: 'IMMEDIATE_CLEANING', clarity: 90, tds: 1150, temperature: 28, level: 30 },
-  { name: 'Sludge stirred up (unsafe clarity)', expect: 'IMMEDIATE_CLEANING', clarity: 45, tds: 300, temperature: 28, level: 18 },
-  { name: 'TDS probe out of water', expect: 'SENSOR_FAULT', clarity: 92, tds: null, temperature: 26, level: 12 },
+  { name: 'Clean water', expect: 'GOOD', clarity: 99, tds: 185, temperature: 24, level: 88 },
+  { name: 'Slight cloudiness', expect: 'SCHEDULE_MAINTENANCE', clarity: 95.5, tds: 240, temperature: 27, level: 62 },
+  { name: 'Hard borewell water', expect: 'SCHEDULE_MAINTENANCE', clarity: 99, tds: 760, temperature: 27, level: 45 },
+  { name: 'Unsafe TDS intrusion', expect: 'IMMEDIATE_CLEANING', clarity: 99, tds: 1150, temperature: 28, level: 30 },
+  { name: 'Sediment stirred up (unfit)', expect: 'IMMEDIATE_CLEANING', clarity: 80, tds: 300, temperature: 28, level: 18 },
+  { name: 'TDS probe out of water', expect: 'SENSOR_FAULT', clarity: 99, tds: null, temperature: 26, level: 12 },
   { name: 'Turbidity sensor unplugged', expect: 'SENSOR_FAULT', clarity: null, tds: 210, temperature: 26, level: 40 },
-  { name: 'Temperature sensor unplugged', expect: 'GOOD', clarity: 94, tds: 200, temperature: null, level: 70 },
-  { name: 'Cleaned and refilled', expect: 'GOOD', clarity: 97, tds: 165, temperature: 23, level: 95 },
+  { name: 'Temperature sensor unplugged', expect: 'GOOD', clarity: 99, tds: 200, temperature: null, level: 70 },
+  { name: 'Cleaned and refilled', expect: 'GOOD', clarity: 99.5, tds: 165, temperature: 23, level: 95 },
 ];
 const READINGS_PER_SCENARIO = 4;
+const TURB_RAW_CLEAR = 2203; // same clean-water reference as the firmware
 
 const jitter = (v, range, digits) => {
   if (v === null) return null;
@@ -46,7 +47,7 @@ function firmwareLines(payload) {
   return [
     `---- Reading #${payload.seq} (3.3V calibrated) ----`,
     `TDS: ${payload.tds === null ? 4 : Math.round(payload.tds * 1.9)} mV -> ${show(payload.tds, ' ppm')}`,
-    `Clarity: Raw=${payload.clarity === null ? 0 : Math.round(95 + (payload.clarity / 100) * 705)} -> ${show(payload.clarity, ' %')}`,
+    `Clarity: Raw=${payload.clarity === null ? 0 : Math.round((payload.clarity / 100) * TURB_RAW_CLEAR)} -> ${show(payload.clarity, ' %')}`,
     `Temperature: ${show(payload.temperature, ' C')}`,
     `Water Level: ${show(payload.level, ' %')}`,
     `DATA ${json}`,

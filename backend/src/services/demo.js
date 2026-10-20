@@ -11,8 +11,8 @@ const BACKFILL_MINUTES = 60;
 // Shift the water-quality baseline to show other dashboard states on demand.
 const PROFILES = {
   good: { clarity: 0, tds: 0 },
-  attention: { clarity: -26, tds: 0 },
-  critical: { clarity: -45, tds: 0 },
+  attention: { clarity: -3.5, tds: 0 },
+  critical: { clarity: -20, tds: 0 },
 };
 
 let enabled = false;
@@ -50,7 +50,7 @@ function demoReading(t, profile) {
   const day = t / (24 * 60 * MINUTE);
   const weekPhase = (day % 7) / 7; // tank cleaned weekly; clarity eases down in between
 
-  const clarity = 97 - 6 * weekPhase + 0.4 * smoothNoise(t, 15, 1) + p.clarity;
+  const clarity = 99.3 - 1.5 * weekPhase + 0.3 * smoothNoise(t, 15, 1) + p.clarity;
   const tds = 212 + 18 * Math.sin((2 * Math.PI * day) / 3) + 3 * smoothNoise(t, 20, 2) + p.tds;
   const temperature = 29 + 3 * Math.sin((2 * Math.PI * (hourOfDay(t) - 9)) / 24) + 0.2 * smoothNoise(t, 10, 3);
   const level = tankLevel(t) + 0.5 * smoothNoise(t, 10, 4);
