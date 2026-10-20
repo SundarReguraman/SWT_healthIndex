@@ -58,6 +58,20 @@ test('non-DATA serial lines and broken JSON are ignored', () => {
   assert.strictEqual(store.getLatest(), null);
 });
 
+test('firmware-format serial output scores every scenario as expected, boot noise included', () => {
+  const { SCENARIOS, scenarioReading, firmwareLines } = require('../src/services/fakeEsp32');
+  quiet(() => {
+    ['ets Jun  8 2016 00:22:57', 'rst:0x1 (POWERON_RESET),boot:0x13', 'DATA {"clar'].forEach(handleLine);
+    for (let seq = 1; seq <= SCENARIOS.length * 4; seq++) {
+      const { scenario } = scenarioReading(seq);
+      firmwareLines(scenarioReading(seq).payload).forEach((line) => handleLine(line + '\r'));
+      const latest = store.getLatest();
+      assert.strictEqual(latest.seq, seq);
+      assert.strictEqual(latest.zone, scenario.expect, `#${seq} ${scenario.name}`);
+    }
+  });
+});
+
 test('demo readings never mix into a live dashboard', () => {
   const now = Date.now();
   for (let i = 10; i >= 1; i--) store.saveReading(demoReading(now - i * 60_000, 'good'));

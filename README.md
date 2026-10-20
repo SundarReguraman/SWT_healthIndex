@@ -107,8 +107,9 @@ npm run dev               # http://localhost:5173
 | `npm start` | Live only. Dashboard waits for a device. |
 | `npm run usb` | Live + reads the ESP32 over USB (auto-detects the port). `node src/server.js --usb=/dev/cu.usbserial-0001` or `--usb=COM5` picks one. |
 | `npm run demo` | Demo feed (one reading per minute, last hour backfilled). `--demo=attention` / `--demo=critical` for other states. |
-| `node src/server.js --usb --demo` | Demo while the board is unplugged; switches to live within one reading of it posting. |
-| `npm run simulate` | (separate terminal) Fake ESP32 that cycles through every state over HTTP. |
+| `node src/server.js --usb --demo` | Demo while the board is unplugged; switches to live within one reading of it posting. **Recommended for presentations.** |
+| `npm run usb:rehearse` | A fake ESP32 on a mock serial port, read by the real USB bridge — rehearse the USB demo with no hardware. |
+| `npm run simulate` | (separate terminal) Fake ESP32 over HTTP — the Wi-Fi path. |
 | `npm test` | Scoring and pipeline tests. |
 
 Demo data is always labelled **Demo data** on the dashboard and is never mixed into live history.
@@ -124,8 +125,8 @@ Work through these in order; each step proves one more link of the chain.
 ```bash
 cd backend && npm test
 ```
-20 tests should pass: sub-scores and band edges, caps, zones, temperature having no effect, sensor faults,
-payload validation, the USB line parser, demo/live separation, events and history averaging.
+21 tests should pass: sub-scores and band edges, caps, zones, temperature having no effect, sensor faults,
+payload validation, the USB line parser on real firmware output, demo/live separation, events and history averaging.
 
 ### 2. Backend + dashboard — simulated device
 
@@ -152,7 +153,17 @@ curl -X POST localhost:3001/api/readings -H 'Content-Type: application/json' \
 curl localhost:3001/api/status                                            # source, age, USB state
 ```
 
-### 3. Real ESP32 over USB
+### 3. USB rehearsal — no hardware
+
+```bash
+cd backend && npm run usb:rehearse
+```
+A fake ESP32 prints exactly what the firmware prints (boot messages, the reading block, the `DATA` line) into
+the real USB bridge every 5 s. The dashboard shows **Live · USB**, a **USB /dev/fake-esp32** chip and the reading
+number, and walks through every state, including the turbidity sensor and temperature sensor being unplugged.
+This is the same path a real board takes from the bridge onwards.
+
+### 4. Real ESP32 over USB
 
 1. Flash the firmware (see below) with `USE_WIFI = false`.
 2. Open the Arduino Serial Monitor at 115200 baud and check the output:
@@ -166,6 +177,7 @@ curl localhost:3001/api/status                                            # sour
    ```
    A disconnected sensor prints `FAULT` and is sent as `null`.
 3. **Close the Serial Monitor** (only one program can hold the port), then `cd backend && npm run usb`.
+   Opening the port resets most ESP32 dev boards, so the reading number starts again at `#1` — that's expected.
    The backend logs `[usb] Connected to /dev/cu.usbserial-…` and one line per reading:
    ```
    [usb] #12 clarity=94.31% tds=203.5ppm temp=27.12°C level=64.1% → score 88 GOOD
@@ -174,19 +186,22 @@ curl localhost:3001/api/status                                            # sour
    backend log's `#N`. If they match, the dashboard is in sync with what the sensors are reading.
 5. Sync checks with the hardware:
    - Dip the turbidity sensor in cloudy water → clarity drops, score falls, an event appears within ~5 s.
+   - Unplug the turbidity sensor → **Sensor fault** (not *Clean now*), *Turbidity sensor stopped responding*.
    - Lift the TDS probe out of the water → **Sensor fault**, *TDS probe stopped responding*.
    - Unplug the DS18B20 → temperature shows **No reading**; the score does not change.
    - Unplug the USB cable → *USB disconnected* event, header turns **Sensor offline**; plug it back in and it reconnects by itself.
 
-### 4. Real ESP32 over Wi-Fi
+### 5. Real ESP32 over Wi-Fi (optional)
 
-Set `USE_WIFI = true`, your SSID/password and `serverUrl` (the backend prints `Wi-Fi devices can POST to http://<ip>:3001/api/readings`
+USB is the default and recommended for demos: no network jitter, and the cable also powers the board.
+For Wi-Fi, set `USE_WIFI = true`, your SSID/password and `serverUrl` (the backend prints `Wi-Fi devices can POST to http://<ip>:3001/api/readings`
 on start), flash, and run `npm start`. The header shows **Live · WIFI**. Same checks as step 3.
 
-### 5. Demo for presentations
+### 6. Demo for presentations
 
-`npm run demo` (or `--demo=attention` / `--demo=critical`). The dashboard shows a **Demo data** banner.
-If a device starts posting, live data replaces the demo immediately; the demo returns 2 minutes after the device stops.
+With the board plugged in: `node src/server.js --usb --demo`. If the cable is knocked out mid-demo, the dashboard
+falls back to clearly labelled **Demo data** after 2 minutes, and live readings take over again from the first one
+after it is plugged back in. Without a board: `npm run demo` (or `--demo=attention` / `--demo=critical`).
 
 ---
 

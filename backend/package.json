@@ -8,7 +8,8 @@
     "usb": "node src/server.js --usb",
     "dev": "nodemon src/server.js",
     "simulate": "node scripts/simulate.js",
-    "test": "node --test"
+    "test": "node --test",
+    "usb:rehearse": "node src/server.js --usb=mock"
   },
   "dependencies": {
     "cors": "^2.8.5",

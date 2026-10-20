@@ -28,6 +28,9 @@ const float SENSOR_OFFSET_CM = 22.0;
 // Turbidity (GPIO 34 @ 3.3V): ~800+ raw counts in clear water, ~95 in cloudy water
 const int TURB_RAW_CLEAR = 800;
 const int TURB_RAW_CLOUDY = 95;
+// Below this the sensor is unplugged or unpowered, not reading dirty water; reported as a fault
+// so a loose cable never shows up as "Clean now". Keep it well under TURB_RAW_CLOUDY.
+const int TURB_RAW_FAULT = 30;
 
 // TDS (GPIO 35 @ 3.3V): probe cell constant K-factor & air deadband
 const float TDS_K_FACTOR = 1.00;
@@ -75,6 +78,7 @@ float getTDSppm(int milliVolts, float temperatureC) {
 }
 
 float getClarityPercent(int rawADC) {
+  if (rawADC < TURB_RAW_FAULT) return NAN; // Sensor disconnected
   float span = (float)(TURB_RAW_CLEAR - TURB_RAW_CLOUDY);
   if (span <= 0) return 0.0;
   float percent = ((float)(rawADC - TURB_RAW_CLOUDY) / span) * 100.0;

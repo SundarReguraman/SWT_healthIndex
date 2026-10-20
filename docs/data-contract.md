@@ -22,7 +22,7 @@ The same JSON object is sent two ways:
 |---|---|---|---|
 | `deviceId` | string | 1–64 of `A–Z a–z 0–9 . - _` | Optional, defaults to `tank-1`. All readings are treated as one tank. |
 | `seq` | integer ≥ 0 | | Optional. Counts up from 1 on every boot; shown on the dashboard so serial output can be matched to it. |
-| `clarity` | number or `null` | 0–100 % | Scored. `null` → sensor fault, no score. |
+| `clarity` | number or `null` | 0–100 % | Scored. The firmware sends `null` when the raw ADC is below `TURB_RAW_FAULT` (sensor unplugged), so a loose cable is a sensor fault, not dirty water. |
 | `tds` | number or `null` | 0–5000 ppm | Scored. The firmware sends `null` when the probe reads below the air deadband (out of water). |
 | `temperature` | number or `null` | −10–80 °C | Not scored. `null` when the DS18B20 is disconnected or returns its 85 °C power-on value. |
 | `level` | number or `null` | 0–100 % | Not scored. `null` when the ultrasonic sensor gets no valid echo. |
